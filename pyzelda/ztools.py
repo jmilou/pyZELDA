@@ -302,7 +302,7 @@ def refractive_index(wave, substrate, T=293):
     return n
 
 
-def create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate, pupil_diameter, R_pupil_pixels, Fratio, wave):
+def create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate, pupil_diameter, R_pupil_pixels, Fratio, wave, apodiser):
     '''
     Simulate the ZELDA reference wave
 
@@ -327,10 +327,12 @@ def create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate
     Fratio : float
         F ratio at the mask focal plane    
 
-    
     wave : float, optional
         Wavelength of the data, in m.
     
+    apodiser : array
+        Array representing the pupil apodisation
+
     Returns
     -------
     reference_wave : array_like
@@ -378,6 +380,10 @@ def create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate
     # defintion of the electric field in plane A in the absence of aberrations
     ampl_PA_noaberr = aperture.disc(pupil_diameter, R_pupil_pixels, cpix=True, strict=False)
 
+    # apodisation
+    if apodiser is not None:
+        ampl_PA_noaberr *= apodiser
+    
     # --------------------------------
     # plane B (Focal plane)
 
@@ -413,7 +419,7 @@ def create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate
 
 
 
-def create_reference_wave(mask_diameter, mask_depth, mask_substrate, pupil_diameter, Fratio, wave):
+def create_reference_wave(mask_diameter, mask_depth, mask_substrate, pupil_diameter, Fratio, wave, apodiser):
     '''
     Simulate the ZELDA reference wave
 
@@ -439,6 +445,9 @@ def create_reference_wave(mask_diameter, mask_depth, mask_substrate, pupil_diame
     wave : float, optional
         Wavelength of the data, in m.
     
+    apodiser : array
+        Array representing the pupil apodisation
+
     Returns
     -------
     reference_wave : array_like
@@ -452,7 +461,7 @@ def create_reference_wave(mask_diameter, mask_depth, mask_substrate, pupil_diame
     R_pupil_pixels = pupil_diameter//2
 
     reference_wave, expi = create_reference_wave_beyond_pupil(mask_diameter, mask_depth, mask_substrate, 
-                                                              pupil_diameter, R_pupil_pixels, Fratio, wave)
+                                                              pupil_diameter, R_pupil_pixels, Fratio, wave, apodiser)
     
     return reference_wave * \
                      aperture.disc(pupil_diameter, R_pupil_pixels, cpix=True, strict=False), expi    

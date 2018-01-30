@@ -39,7 +39,7 @@ class Sensor():
     # Constructor
     ##################################################
     
-    def __init__(self, instrument):
+    def __init__(self, instrument, apodiser=None):
         '''
         Initialization of the Sensor class
 
@@ -47,6 +47,9 @@ class Sensor():
         ----------
         instrument : str
             Instrument associated with the sensor
+
+        apodiser : str
+            Name of the apodiser. Default is no apodiser
         '''
 
         self._instrument = instrument
@@ -74,6 +77,15 @@ class Sensor():
             cx = int(config.get('detector_crop', 'origin_x'))
             cy = int(config.get('detector_crop', 'origin_y'))
             self._origin = (cx, cy)
+
+            # apodiser
+            self._apodiser = None
+            if apodiser is not None:
+                apo_name = '{0}_{1}_field_transmission_map.fits'.format(instrument, apodiser)
+                apo_file = os.path.join(package_directory, 'data', apo_name)
+                apo = fits.getdata(apo_file)
+                
+                self._apodiser = apo
         except ConfigParser.Error as e:
             raise ValueError('Error reading configuration file for instrument {0}: {1}'.format(instrument, e.message))
         
@@ -117,6 +129,10 @@ class Sensor():
     @property
     def detector_subwindow_origin(self):
         return self._origin
+
+    @property
+    def apodiser(self):
+        return self._apodiser
 
     ##################################################
     # Methods
@@ -283,7 +299,8 @@ class Sensor():
         for w in wave:
             reference_wave, expi = ztools.create_reference_wave(self._mask_diameter, self._mask_depth,
                                                                 self._mask_substrate,
-                                                                pupil_diameter, self._Fratio, w)
+                                                                pupil_diameter, self._Fratio, w,
+                                                                self._apodiser)
             mask_diffraction_prop.append((reference_wave, expi))
 
         # ++++++++++++++++++++++++++++++++++
@@ -291,6 +308,14 @@ class Sensor():
         # ++++++++++++++++++++++++++++++++++
         pup = aperture.disc(pupil_diameter, R_pupil_pixels, mask=True, cpix=True, strict=False)
 
+        # ++++++++++++++++++++++++++++++++++
+        # Apodiser
+        # ++++++++++++++++++++++++++++++++++
+        if self._apodiser is not None:
+            apodiser = self._apodiser
+        else:
+            apodiser = np.ones_like(pup)
+        
         print('ZELDA analysis')
         nframes_clear = len(clear_pupil)
         nframes_zelda = len(zelda_pupil)
@@ -311,6 +336,7 @@ class Sensor():
             else:
                 zelda_norm = zelda_pupil[idx] / clear_pupil[idx]
             zelda_norm = zelda_norm.squeeze()
+            zelda_norm = zelda_norm * apodiser
             zelda_norm[~pup] = 0
 
             # mask_diffraction_prop array contains the mask diffracted properties:
@@ -340,8 +366,8 @@ class Sensor():
                 print('Negative values: {0} ({1:0.3f}%)'.format(neg_count, ratio))
 
             # too many nagative values
-            if (ratio > 1):
-                raise NameError('Too many negative values in determinant (>1%)')
+            # if (ratio > 1):
+            #     raise NameError('Too many negative values in determinant (>1%)')
 
             # replace negative values by 0
             delta[neg_values] = 0
